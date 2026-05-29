@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { useCartStore } from '../../context/cartStore';
-import { EmptyState } from '../shared/errors/EmptyState';
+
+const TAX_RATE = 0.1;
+const SHIPPING_COST = 5;
 
 interface CartSummaryProps {
   onCheckout?: () => void;
@@ -9,24 +11,13 @@ interface CartSummaryProps {
 export const CartSummary: React.FC<CartSummaryProps> = ({ onCheckout }) => {
   const { items, getTotal, getItemCount } = useCartStore();
 
-  const subtotal = useMemo(() => getTotal(), [getTotal]);
-  const tax = useMemo(() => subtotal * 0.1, [subtotal]); // 10% tax
-  const shipping = 5; // Fixed shipping
-  const total = useMemo(() => subtotal + tax + shipping, [subtotal]);
-  const itemCount = useMemo(() => getItemCount(), [getItemCount]);
+  const subtotal = useMemo(() => getTotal(), [getTotal, items]);
+  // BUG FIX: tax and shipping calculation consistent with CheckoutPage
+  const tax = useMemo(() => subtotal * TAX_RATE, [subtotal]);
+  const total = useMemo(() => subtotal + tax + SHIPPING_COST, [subtotal, tax]);
+  const itemCount = useMemo(() => getItemCount(), [getItemCount, items]);
 
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        title="Your cart is empty"
-        message="Add some items to get started"
-        action={{
-          label: 'Continue Shopping',
-          onClick: () => window.location.href = '/',
-        }}
-      />
-    );
-  }
+  if (items.length === 0) return null;
 
   return (
     <div
@@ -51,7 +42,7 @@ export const CartSummary: React.FC<CartSummaryProps> = ({ onCheckout }) => {
         </p>
         <p style={{ display: 'flex', justifyContent: 'space-between', margin: '0.5rem 0' }}>
           <span>Shipping:</span>
-          <span>${shipping.toFixed(2)}</span>
+          <span>${SHIPPING_COST.toFixed(2)}</span>
         </p>
       </div>
 

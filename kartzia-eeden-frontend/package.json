@@ -1,17 +1,24 @@
 {
   "name": "kartzia-eeden-frontend",
   "version": "1.0.0",
-  "description": "Kartzia Eeden - Landing Page",
+  "description": "Kartzia Eeden - E-commerce Frontend",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "typescript": "^5.0.0",
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "zod": "^4.3.6",
-    "zustand": "^5.0.11"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zod": "^3.22.0",
+    "zustand": "^4.4.0"
   }
 }

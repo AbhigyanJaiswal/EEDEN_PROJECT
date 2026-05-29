@@ -99,12 +99,11 @@ export const CartPage: React.FC<CartPageProps> = ({ onNavigate }) => {
             gap: '2rem',
           }}
         >
-          <CartItems />
+          {/* BUG FIX: pass onNavigate so CartItems doesn't use window.location.href */}
+          <CartItems onNavigate={onNavigate} />
 
           {items.length > 0 && (
-            <CartSummary
-              onCheckout={() => onNavigate('checkout')}
-            />
+            <CartSummary onCheckout={() => onNavigate('checkout')} />
           )}
         </div>
 

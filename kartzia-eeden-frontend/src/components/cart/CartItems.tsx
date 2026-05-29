@@ -2,7 +2,12 @@ import React, { useCallback, memo } from 'react';
 import { useCartStore, CartItem } from '../../context/cartStore';
 import { EmptyState } from '../shared/errors/EmptyState';
 
-export const CartItems: React.FC = memo(() => {
+interface CartItemsProps {
+  // BUG FIX: receive onNavigate so empty-cart action doesn't use window.location.href
+  onNavigate?: (page: string) => void;
+}
+
+export const CartItems: React.FC<CartItemsProps> = memo(({ onNavigate }) => {
   const { items, removeItem, updateQuantity } = useCartStore();
 
   const handleQuantityChange = useCallback(
@@ -26,23 +31,22 @@ export const CartItems: React.FC = memo(() => {
       <EmptyState
         title="Your cart is empty"
         message="Browse our products and add items to your cart"
-        action={{
-          label: 'Continue Shopping',
-          onClick: () => window.location.href = '/',
-        }}
+        action={
+          onNavigate
+            ? { label: 'Continue Shopping', onClick: () => onNavigate('home') }
+            : undefined
+        }
       />
     );
   }
 
   return (
     <div className="cart-items">
+      {/* BUG FIX: role="table" (not "presentation") so screen readers announce the data table */}
       <table
-        style={{
-          width: '100%',
-          borderCollapse: 'collapse',
-          marginBottom: '2rem',
-        }}
-        role="presentation"
+        style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '2rem' }}
+        role="table"
+        aria-label="Cart items"
       >
         <thead>
           <tr style={{ borderBottom: '2px solid #ddd' }}>
@@ -58,11 +62,12 @@ export const CartItems: React.FC = memo(() => {
             <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
               <td style={{ padding: '1rem' }}>
                 {item.image && (
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    style={{ width: '50px', height: '50px', marginRight: '1rem', borderRadius: '4px' }}
-                  />
+                  <span
+                    style={{ fontSize: '2rem', marginRight: '0.75rem' }}
+                    aria-hidden="true"
+                  >
+                    {item.image}
+                  </span>
                 )}
                 <span>{item.name}</span>
               </td>
@@ -72,7 +77,7 @@ export const CartItems: React.FC = memo(() => {
                   type="number"
                   min="1"
                   value={item.quantity}
-                  onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value))}
+                  onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value, 10))}
                   style={{
                     width: '60px',
                     padding: '0.25rem',

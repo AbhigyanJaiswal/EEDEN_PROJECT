@@ -28,7 +28,7 @@ export const LoginForm: React.FC<LoginFormProps> = memo(({ onSuccess }) => {
   );
 
   return (
-    <form onSubmit={form.handleSubmit(() => {})} noValidate aria-label="Login form">
+    <form onSubmit={form.handleSubmit()} noValidate aria-label="Login form">
       {(submitError || error) && (
         <ErrorState message={submitError || error || 'Login failed'} />
       )}

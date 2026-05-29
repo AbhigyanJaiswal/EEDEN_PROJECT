@@ -50,7 +50,7 @@ export const AddressForm: React.FC<AddressFormProps> = memo(({ initialAddress, o
   );
 
   return (
-    <form onSubmit={form.handleSubmit(() => {})} noValidate aria-label="Address form">
+    <form onSubmit={form.handleSubmit()} noValidate aria-label="Address form">
       {submitError && <ErrorState message={submitError} />}
 
       <div className="form-group" style={{ marginBottom: '1rem' }}>

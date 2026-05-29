@@ -28,7 +28,7 @@ export const SignupForm: React.FC<SignupFormProps> = memo(({ onSuccess }) => {
   );
 
   return (
-    <form onSubmit={form.handleSubmit(() => {})} noValidate aria-label="Signup form">
+    <form onSubmit={form.handleSubmit()} noValidate aria-label="Signup form">
       {(submitError || error) && (
         <ErrorState message={submitError || error || 'Signup failed'} />
       )}

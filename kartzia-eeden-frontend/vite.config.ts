@@ -1,13 +1,26 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  root: './Kartzia Eeden Landing Page',
+  plugins: [react()],
   server: {
     port: 5173,
     open: true,
   },
   build: {
-    outDir: '../dist',
-    sourcemap: true,
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          store: ['zustand'],
+          validation: ['zod'],
+        },
+      },
+    },
+  },
+  preview: {
+    port: 4173,
   },
 });

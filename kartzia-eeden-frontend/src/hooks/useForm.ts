@@ -9,13 +9,13 @@ interface FormState<T> {
 }
 
 interface UseFormReturn<T> extends FormState<T> {
-  handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-  handleBlur: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => void;
-  // BUG FIX: calling with no args (or omitting) uses the onSubmit given at init
+  handleChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
+  handleBlur: (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => void;
   handleSubmit: (onSubmitOverride?: (values: T) => Promise<void> | void) => (e: React.FormEvent) => Promise<void>;
   setFieldValue: (field: keyof T, value: unknown) => void;
   setFieldError: (field: keyof T, error: string) => void;
   reset: () => void;
+  isValid: boolean;
 }
 
 export function useForm<T extends Record<string, unknown>>(
@@ -23,6 +23,8 @@ export function useForm<T extends Record<string, unknown>>(
   validationSchema?: ZodSchema,
   onSubmit?: (values: T) => Promise<void> | void
 ): UseFormReturn<T> {
+  const initialRef = useRef(initialValues);
+
   const [formState, setFormState] = useState<FormState<T>>({
     values: initialValues,
     errors: {},
@@ -30,7 +32,6 @@ export function useForm<T extends Record<string, unknown>>(
     isSubmitting: false,
   });
 
-  // BUG FIX: keep latest values + onSubmit in refs so handleSubmit doesn't capture stale closures
   const valuesRef = useRef<T>(initialValues);
   valuesRef.current = formState.values;
 
@@ -46,9 +47,9 @@ export function useForm<T extends Record<string, unknown>>(
       } catch (error) {
         if (error instanceof ZodError) {
           const fieldErrors: Record<string, string> = {};
-          error.issues.forEach((err) => {
-            const path = err.path.join('.');
-            fieldErrors[path] = err.message;
+          error.issues.forEach((issue) => {
+            const path = issue.path.join('.');
+            if (!fieldErrors[path]) fieldErrors[path] = issue.message;
           });
           return fieldErrors;
         }
@@ -59,26 +60,37 @@ export function useForm<T extends Record<string, unknown>>(
   );
 
   const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { name, value, type } = e.target;
       const newValue = type === 'checkbox' ? (e.target as HTMLInputElement).checked : value;
+
       setFormState((prev) => {
         const newValues = { ...prev.values, [name]: newValue };
-        return { ...prev, values: newValues, errors: validate(newValues) };
+        // FIX: only revalidate a field after the user has already touched it.
+        // Without this, errors appear while typing the very first character.
+        const newErrors = prev.touched[name]
+          ? validate(newValues)
+          : prev.errors;
+        return { ...prev, values: newValues, errors: newErrors };
       });
     },
     [validate]
   );
 
   const handleBlur = useCallback(
-    (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { name } = e.target;
-      setFormState((prev) => ({
-        ...prev,
-        touched: { ...prev.touched, [name]: true },
-      }));
+      setFormState((prev) => {
+        // Validate on blur so the error appears when the user leaves the field
+        const errors = validate(prev.values);
+        return {
+          ...prev,
+          touched: { ...prev.touched, [name]: true },
+          errors,
+        };
+      });
     },
-    []
+    [validate]
   );
 
   const handleSubmit = useCallback(
@@ -89,19 +101,16 @@ export function useForm<T extends Record<string, unknown>>(
         const currentValues = valuesRef.current;
         const errors = validate(currentValues);
 
-        // Mark all fields touched and show errors
-        setFormState((prev) => ({
-          ...prev,
-          errors,
-          touched: Object.keys(prev.values).reduce(
-            (acc, key) => ({ ...acc, [key]: true }),
-            {} as Record<string, boolean>
-          ),
-        }));
+        // Mark every field as touched so all errors are visible on submit
+        const allTouched = Object.keys(currentValues).reduce<Record<string, boolean>>(
+          (acc, key) => ({ ...acc, [key]: true }),
+          {}
+        );
+
+        setFormState((prev) => ({ ...prev, errors, touched: allTouched }));
 
         if (Object.keys(errors).length > 0) return;
 
-        // BUG FIX: use override only if it's a real callback, else fall back to stored onSubmit
         const callback = onSubmitOverride ?? onSubmitRef.current;
         if (!callback) return;
 
@@ -119,7 +128,10 @@ export function useForm<T extends Record<string, unknown>>(
     (field: keyof T, value: unknown) => {
       setFormState((prev) => {
         const newValues = { ...prev.values, [field]: value };
-        return { ...prev, values: newValues, errors: validate(newValues) };
+        const newErrors = prev.touched[field as string]
+          ? validate(newValues)
+          : prev.errors;
+        return { ...prev, values: newValues, errors: newErrors };
       });
     },
     [validate]
@@ -128,18 +140,20 @@ export function useForm<T extends Record<string, unknown>>(
   const setFieldError = useCallback((field: keyof T, error: string) => {
     setFormState((prev) => ({
       ...prev,
-      errors: { ...prev.errors, [field]: error },
+      errors: { ...prev.errors, [field as string]: error },
     }));
   }, []);
 
   const reset = useCallback(() => {
     setFormState({
-      values: initialValues,
+      values: initialRef.current,
       errors: {},
       touched: {},
       isSubmitting: false,
     });
-  }, [initialValues]);
+  }, []);
+
+  const isValid = Object.keys(formState.errors).length === 0;
 
   return {
     ...formState,
@@ -149,5 +163,6 @@ export function useForm<T extends Record<string, unknown>>(
     setFieldValue,
     setFieldError,
     reset,
+    isValid,
   };
 }

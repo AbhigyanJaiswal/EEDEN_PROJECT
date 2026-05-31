@@ -12,9 +12,10 @@ export interface CartItem {
 
 export interface CartState {
   items: CartItem[];
+  // NOTE: `total` is kept as derived state for convenience, but it is NOT
+  // persisted — see partialize below. It is always recomputed from items.
   total: number;
 
-  // Actions
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
@@ -23,25 +24,24 @@ export interface CartState {
   getItemCount: () => number;
 }
 
-// BUG FIX: compute total inline instead of calling getTotal() before state is committed
 const computeTotal = (items: CartItem[]): number =>
   items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
-      items: [] as CartItem[],
+      items: [],
       total: 0,
 
       addItem: (item: CartItem) =>
         set((state) => {
-          const existingItem = state.items.find((i) => i.id === item.id);
-          const updatedItems = existingItem
+          const qty = Math.max(1, item.quantity ?? 1);
+          const existing = state.items.find((i) => i.id === item.id);
+          const updatedItems = existing
             ? state.items.map((i) =>
-                i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+                i.id === item.id ? { ...i, quantity: i.quantity + qty } : i
               )
-            : [...state.items, item];
-          // BUG FIX: total computed from the NEW items array, not the old state
+            : [...state.items, { ...item, quantity: qty }];
           return { items: updatedItems, total: computeTotal(updatedItems) };
         }),
 
@@ -53,26 +53,32 @@ export const useCartStore = create<CartState>()(
 
       updateQuantity: (id: string, quantity: number) =>
         set((state) => {
+          const safeQty = Math.max(1, quantity);
           const updatedItems = state.items.map((item) =>
-            item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
+            item.id === id ? { ...item, quantity: safeQty } : item
           );
           return { items: updatedItems, total: computeTotal(updatedItems) };
         }),
 
       clearCart: () => set({ items: [], total: 0 }),
 
-      getTotal: () => {
-        const state = get();
-        return computeTotal(state.items);
-      },
+      getTotal: () => computeTotal(get().items),
 
-      getItemCount: () => {
-        const state = get();
-        return state.items.reduce((count, item) => count + item.quantity, 0);
-      },
+      getItemCount: () =>
+        get().items.reduce((count, item) => count + item.quantity, 0),
     }),
     {
       name: 'cart-storage',
+      // FIX: only persist `items` — total is always recomputed on hydration.
+      // Without this, a stale `total` from localStorage would be used on first
+      // render before items are loaded, showing the wrong number.
+      partialize: (state) => ({ items: state.items }),
+      // After hydrating items, recompute total immediately so it's never stale.
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.total = computeTotal(state.items);
+        }
+      },
     }
   )
 );
